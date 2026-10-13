@@ -366,3 +366,32 @@ const body = k.plateHtml({
 const name = theme === "light" ? "gut-bench-light.html" : "gut-bench.html";
 writeFileSync(join(HERE, name), k.pageHtml({ title: "Gut-wall growth bench", theme, body, script: kitScript() + live }));
 console.log("wrote", name);
+
+// One page for sharing: it follows the viewer's theme (an explicit data-theme on <html>, else the system setting).
+// `index.html` is a full document for GitHub Pages; `artifact.html` is the same page without the document skeleton.
+const AUTO_CSS = `
+:root{--page-bg:#0b0b0b;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--page-bg:#f2f2ef;color-scheme:light}}
+:root[data-theme="light"]{--page-bg:#f2f2ef;color-scheme:light}
+:root[data-theme="dark"]{--page-bg:#0b0b0b;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg)}
+.iso.bench{background:var(--anatomy-page);color:var(--anatomy-text);font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;padding-inline:16px;padding-block:48px 72px}
+.bench .iso-page{width:min(650px,100%);margin:0 auto}
+`;
+const AUTO_THEME = `
+const benchRoot = document.querySelector(".iso.bench");
+const prefersLight = matchMedia("(prefers-color-scheme: light)");
+const applyTheme = () => {
+  const chosen = document.documentElement.dataset.theme;
+  benchRoot.dataset.theme = chosen === "light" || (chosen !== "dark" && prefersLight.matches) ? "light" : "dark";
+};
+applyTheme();
+prefersLight.addEventListener("change", applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+`;
+const autoScript = `<script type="module">${(AUTO_THEME + kitScript() + live).replace(/<\/(script)/gi, "<\\/$1")}</script>`;
+const autoBody = `<title>Gut-wall growth bench</title><style>${k.ISO_CSS}${AUTO_CSS}</style><div class="iso bench" data-theme="dark"><main class="iso-page">${body}</main></div>${autoScript}`;
+writeFileSync(join(HERE, "artifact.html"), autoBody);
+writeFileSync(join(HERE, "index.html"), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${autoBody.replace("</style>", "</style></head><body>")}</body></html>`);
+console.log("wrote index.html, artifact.html");
